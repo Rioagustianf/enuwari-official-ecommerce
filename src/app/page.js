@@ -1,103 +1,170 @@
-import Image from "next/image";
+"use client";
+import { useState, useEffect } from "react";
+import {
+  Container,
+  Typography,
+  Grid,
+  Box,
+  Button,
+  Card,
+  CardMedia,
+  CardContent,
+} from "@mui/material";
+import { useRouter } from "next/navigation";
+import Header from "@/components/ui/Header";
+import Footer from "@/components/ui/Footer";
+import ProductCard from "@/components/shop/ProductCard";
+import axios from "axios";
 
-export default function Home() {
+export default function HomePage() {
+  const router = useRouter();
+  const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [banners, setBanners] = useState([]);
+
+  useEffect(() => {
+    fetchFeaturedProducts();
+    fetchCategories();
+    fetchBanners();
+  }, []);
+
+  const fetchFeaturedProducts = async () => {
+    try {
+      const response = await axios.get("/api/products?featured=true&limit=8");
+      setFeaturedProducts(response.data.products);
+    } catch (error) {
+      console.error("Error fetching featured products:", error);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get("/api/categories");
+      setCategories(response.data);
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+    }
+  };
+
+  const fetchBanners = async () => {
+    try {
+      const response = await axios.get("/api/banners");
+      setBanners(response.data);
+    } catch (error) {
+      console.error("Error fetching banners:", error);
+    }
+  };
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <>
+      <Header />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+      {/* Hero Banner */}
+      <Box sx={{ mb: 4 }}>
+        {banners.length > 0 && (
+          <Card>
+            <CardMedia
+              component="img"
+              height="400"
+              image={banners[0].image}
+              alt={banners[0].title}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <CardContent sx={{ textAlign: "center" }}>
+              <Typography variant="h3" gutterBottom>
+                {banners[0].title}
+              </Typography>
+              <Typography variant="h6" color="text.secondary" gutterBottom>
+                {banners[0].subtitle}
+              </Typography>
+              <Button
+                variant="contained"
+                size="large"
+                onClick={() => router.push("/products")}
+              >
+                Belanja Sekarang
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </Box>
+
+      <Container maxWidth="lg">
+        {/* Categories Section */}
+        <Box sx={{ mb: 6 }}>
+          <Typography variant="h4" gutterBottom textAlign="center">
+            Kategori Produk
+          </Typography>
+          <Grid container spacing={3}>
+            {categories.map((category) => (
+              <Grid size={{ xs: 6, sm: 4, md: 3 }} key={category.id}>
+                <Card
+                  sx={{ cursor: "pointer" }}
+                  onClick={() =>
+                    router.push(`/products/category/${category.slug}`)
+                  }
+                >
+                  <CardMedia
+                    component="img"
+                    height="150"
+                    image={category.image || "/placeholder.jpg"}
+                    alt={category.name}
+                  />
+                  <CardContent>
+                    <Typography variant="h6" textAlign="center">
+                      {category.name}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Box>
+
+        {/* Featured Products */}
+        <Box sx={{ mb: 6 }}>
+          <Typography variant="h4" gutterBottom textAlign="center">
+            Produk Unggulan
+          </Typography>
+          <Grid container spacing={3}>
+            {featuredProducts.map((product) => (
+              <Grid size={{ xs: 12, sm: 6, md: 3 }} key={product.id}>
+                <ProductCard product={product} />
+              </Grid>
+            ))}
+          </Grid>
+          <Box sx={{ textAlign: "center", mt: 4 }}>
+            <Button
+              variant="outlined"
+              size="large"
+              onClick={() => router.push("/products")}
+            >
+              Lihat Semua Produk
+            </Button>
+          </Box>
+        </Box>
+
+        {/* WhatsApp Contact */}
+        <Box sx={{ textAlign: "center", mb: 4 }}>
+          <Typography variant="h5" gutterBottom>
+            Butuh Bantuan?
+          </Typography>
+          <Button
+            variant="contained"
+            color="success"
+            size="large"
+            onClick={() =>
+              window.open(
+                `https://wa.me/${process.env.NEXT_PUBLIC_ADMIN_WHATSAPP}`,
+                "_blank"
+              )
+            }
           >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+            Hubungi Admin via WhatsApp
+          </Button>
+        </Box>
+      </Container>
+
+      <Footer />
+    </>
   );
 }
