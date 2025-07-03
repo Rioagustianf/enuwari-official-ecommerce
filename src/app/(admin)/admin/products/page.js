@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import {
   Typography,
   Box,
@@ -40,7 +40,7 @@ import {
 import { useRouter } from "next/navigation";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import Pagination from "@/components/common/Pagination";
-import axios from "axios";
+import { NotificationContext } from "@/context/NotificationContext";
 
 export default function AdminProductsPage() {
   const router = useRouter();
@@ -61,6 +61,7 @@ export default function AdminProductsPage() {
     total: 0,
     totalPages: 0,
   });
+  const { showError } = useContext(NotificationContext);
 
   useEffect(() => {
     fetchProducts();
@@ -75,15 +76,17 @@ export default function AdminProductsPage() {
         limit: pagination.limit,
         ...filters,
       });
-
-      const response = await axios.get(`/api/products?${params}`);
-      setProducts(response.data.products);
+      const res = await fetch(`/api/products?${params}`);
+      if (!res.ok) throw new Error("Gagal fetch produk");
+      const response = await res.json();
+      setProducts(response.products);
       setPagination((prev) => ({
         ...prev,
-        total: response.data.pagination.total,
-        totalPages: response.data.pagination.totalPages,
+        total: response.pagination.total,
+        totalPages: response.pagination.totalPages,
       }));
     } catch (error) {
+      showError("Oops! Gagal ambil data produk, coba refresh dulu 😅");
       console.error("Error fetching products:", error);
     } finally {
       setLoading(false);
@@ -92,9 +95,12 @@ export default function AdminProductsPage() {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get("/api/categories");
-      setCategories(response.data);
+      const res = await fetch("/api/categories");
+      if (!res.ok) throw new Error("Gagal fetch kategori");
+      const response = await res.json();
+      setCategories(response);
     } catch (error) {
+      showError("Gagal ambil kategori, coba refresh!");
       console.error("Error fetching categories:", error);
     }
   };
@@ -116,16 +122,31 @@ export default function AdminProductsPage() {
 
   const handleDelete = () => {
     setDeleteDialog(true);
-    handleMenuClose();
   };
 
   const confirmDelete = async () => {
+    if (!selectedProduct || !selectedProduct.id) {
+      showError("Produk tidak valid untuk dihapus");
+      setDeleteDialog(false);
+      setSelectedProduct(null);
+      return;
+    }
     try {
-      await axios.delete(`/api/products/${selectedProduct.id}`);
+      const res = await fetch(`/api/products/${selectedProduct.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Gagal hapus produk");
+      }
       fetchProducts();
       setDeleteDialog(false);
+      setSelectedProduct(null);
     } catch (error) {
+      showError("Gagal hapus produk, servernya lagi ngambek 😭");
       console.error("Error deleting product:", error);
+      setDeleteDialog(false);
+      setSelectedProduct(null);
     }
   };
 
@@ -253,8 +274,11 @@ export default function AdminProductsPage() {
                         <Box sx={{ display: "flex", alignItems: "center" }}>
                           <Avatar
                             src={
-                              product.images
-                                ? JSON.parse(product.images)[0]
+                              Array.isArray(product.images)
+                                ? product.images[0]
+                                : typeof product.images === "string" &&
+                                  product.images.trim() !== ""
+                                ? JSON.parse(product.images)[0] || ""
                                 : ""
                             }
                             variant="rounded"
@@ -389,7 +413,13 @@ export default function AdminProductsPage() {
       </Menu>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialog} onClose={() => setDeleteDialog(false)}>
+      <Dialog
+        open={deleteDialog}
+        onClose={() => {
+          setDeleteDialog(false);
+          setSelectedProduct(null);
+        }}
+      >
         <DialogTitle>Konfirmasi Hapus</DialogTitle>
         <DialogContent>
           <Typography>
@@ -398,7 +428,14 @@ export default function AdminProductsPage() {
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialog(false)}>Batal</Button>
+          <Button
+            onClick={() => {
+              setDeleteDialog(false);
+              setSelectedProduct(null);
+            }}
+          >
+            Batal
+          </Button>
           <Button onClick={confirmDelete} color="error" variant="contained">
             Hapus
           </Button>

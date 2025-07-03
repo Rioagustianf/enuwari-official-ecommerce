@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import {
   Typography,
   Box,
@@ -21,7 +21,7 @@ import {
 import { Search, Person } from "@mui/icons-material";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import Pagination from "@/components/common/Pagination";
-import axios from "axios";
+import { NotificationContext } from "@/context/NotificationContext";
 
 export default function AdminCustomersPage() {
   const [customers, setCustomers] = useState([]);
@@ -33,6 +33,7 @@ export default function AdminCustomersPage() {
     total: 0,
     totalPages: 0,
   });
+  const { showError } = useContext(NotificationContext);
 
   useEffect(() => {
     fetchCustomers();
@@ -51,14 +52,17 @@ export default function AdminCustomersPage() {
         params.append("search", searchQuery);
       }
 
-      const response = await axios.get(`/api/users?${params}`);
-      setCustomers(response.data.users);
+      const res = await fetch(`/api/users?${params}`);
+      if (!res.ok) throw new Error("Gagal fetch pelanggan");
+      const data = await res.json();
+      setCustomers(data.users);
       setPagination((prev) => ({
         ...prev,
-        total: response.data.pagination.total,
-        totalPages: response.data.pagination.totalPages,
+        total: data.pagination.total,
+        totalPages: data.pagination.totalPages,
       }));
     } catch (error) {
+      showError("Oops! Gagal ambil data pelanggan, coba refresh dulu 😅");
       console.error("Error fetching customers:", error);
     } finally {
       setLoading(false);

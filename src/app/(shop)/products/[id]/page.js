@@ -277,7 +277,24 @@ export default function ProductDetailPage({ params }) {
     );
   }
 
-  const images = product.images ? JSON.parse(product.images) : [];
+  // Robust parsing images
+  let images = [];
+  if (Array.isArray(product.images)) {
+    images = product.images;
+  } else if (
+    typeof product.images === "string" &&
+    product.images.trim() !== ""
+  ) {
+    try {
+      const parsed = JSON.parse(product.images);
+      images = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      images = [];
+    }
+  } else {
+    images = [];
+  }
+
   const currentPrice = product.salePrice || product.price;
   const discountPercentage = product.salePrice
     ? Math.round(((product.price - product.salePrice) / product.price) * 100)

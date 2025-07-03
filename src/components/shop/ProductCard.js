@@ -254,6 +254,21 @@ export default function ProductCard({ product }) {
           {product.name}
         </Typography>
 
+        {/* Ukuran Produk */}
+        {Array.isArray(product.productSizes) &&
+          product.productSizes.length > 0 && (
+            <Box sx={{ mb: 1, display: "flex", flexWrap: "wrap", gap: 0.5 }}>
+              {product.productSizes.map((size, idx) => (
+                <Chip
+                  key={idx}
+                  label={size.size}
+                  size="small"
+                  variant="outlined"
+                />
+              ))}
+            </Box>
+          )}
+
         {/* Rating & Reviews */}
         <Stack direction="row" alignItems="center" spacing={1} sx={{ my: 0.5 }}>
           <Rating

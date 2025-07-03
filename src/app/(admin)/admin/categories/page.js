@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import {
   Typography,
   Box,
@@ -29,9 +29,10 @@ import {
   Edit,
   Delete,
   Category as CategoryIcon,
+  CloudUpload,
 } from "@mui/icons-material";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
-import axios from "axios";
+import { NotificationContext } from "@/context/NotificationContext";
 
 export default function AdminCategoriesPage() {
   const [categories, setCategories] = useState([]);
@@ -47,6 +48,7 @@ export default function AdminCategoriesPage() {
     image: "",
     isActive: true,
   });
+  const { showError } = useContext(NotificationContext);
 
   useEffect(() => {
     fetchCategories();
@@ -55,9 +57,12 @@ export default function AdminCategoriesPage() {
   const fetchCategories = async () => {
     setLoading(true);
     try {
-      const response = await axios.get("/api/categories");
-      setCategories(response.data);
+      const res = await fetch("/api/categories");
+      if (!res.ok) throw new Error("Gagal fetch kategori");
+      const data = await res.json();
+      setCategories(data);
     } catch (error) {
+      showError("Oops! Gagal ambil data kategori, coba refresh dulu 😅");
       console.error("Error fetching categories:", error);
     } finally {
       setLoading(false);
@@ -96,13 +101,24 @@ export default function AdminCategoriesPage() {
   const handleSubmit = async () => {
     try {
       if (dialog.mode === "create") {
-        await axios.post("/api/categories", formData);
+        const res = await fetch("/api/categories", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+        if (!res.ok) throw new Error("Gagal simpan kategori");
       } else {
-        await axios.put(`/api/categories/${dialog.data.id}`, formData);
+        const res = await fetch(`/api/categories/${dialog.data.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+        if (!res.ok) throw new Error("Gagal update kategori");
       }
       fetchCategories();
       handleCloseDialog();
     } catch (error) {
+      showError("Yah, gagal simpan kategori. Coba lagi bentar ya!");
       console.error("Error saving category:", error);
     }
   };
@@ -110,11 +126,37 @@ export default function AdminCategoriesPage() {
   const handleDelete = async (categoryId) => {
     if (window.confirm("Apakah Anda yakin ingin menghapus kategori ini?")) {
       try {
-        await axios.delete(`/api/categories/${categoryId}`);
+        const res = await fetch(`/api/categories/${categoryId}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) throw new Error("Gagal hapus kategori");
         fetchCategories();
       } catch (error) {
+        showError("Gagal hapus kategori, servernya lagi ngambek 😭");
         console.error("Error deleting category:", error);
       }
+    }
+  };
+
+  const handleImageUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    const formDataUpload = new FormData();
+    formDataUpload.append("images", file);
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formDataUpload,
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Gagal upload gambar");
+      }
+      const data = await res.json();
+      setFormData((prev) => ({ ...prev, image: data.files[0] }));
+    } catch (err) {
+      const msg = err.message || "Gagal upload gambar";
+      if (showError) showError(msg);
     }
   };
 
@@ -275,14 +317,36 @@ export default function AdminCategoriesPage() {
               />
             </Grid>
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="URL Gambar"
-                value={formData.image}
-                onChange={(e) =>
-                  setFormData({ ...formData, image: e.target.value })
-                }
-              />
+              <Box sx={{ my: 2 }}>
+                <Button
+                  variant="outlined"
+                  component="label"
+                  startIcon={<CloudUpload />}
+                  sx={{ mb: 1 }}
+                >
+                  Upload Gambar
+                  <input
+                    type="file"
+                    hidden
+                    accept="image/*"
+                    onChange={handleImageUpload}
+                  />
+                </Button>
+                {formData.image && (
+                  <Box sx={{ mt: 1 }}>
+                    <img
+                      src={formData.image}
+                      alt="Preview"
+                      style={{
+                        width: 120,
+                        height: 120,
+                        objectFit: "cover",
+                        borderRadius: 8,
+                      }}
+                    />
+                  </Box>
+                )}
+              </Box>
             </Grid>
             <Grid item xs={12}>
               <FormControlLabel

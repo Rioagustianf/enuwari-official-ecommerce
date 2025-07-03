@@ -19,7 +19,6 @@ import Footer from "@/components/ui/Footer";
 import ProductGrid from "@/components/shop/ProductGrid";
 import CategoryFilter from "@/components/shop/CategoryFilter";
 import Pagination from "@/components/common/Pagination";
-import axios from "axios";
 
 export default function ProductsPage() {
   const [products, setProducts] = useState([]);
@@ -46,13 +45,14 @@ export default function ProductsPage() {
         limit: pagination.limit,
         ...filters,
       });
-
-      const response = await axios.get(`/api/products?${params}`);
-      setProducts(response.data.products);
+      const res = await fetch(`/api/products?${params}`);
+      if (!res.ok) throw new Error("Gagal memuat produk");
+      const data = await res.json();
+      setProducts(data.products);
       setPagination((prev) => ({
         ...prev,
-        total: response.data.pagination.total,
-        totalPages: response.data.pagination.totalPages,
+        total: data.pagination.total,
+        totalPages: data.pagination.totalPages,
       }));
     } catch (error) {
       setError("Gagal memuat produk");

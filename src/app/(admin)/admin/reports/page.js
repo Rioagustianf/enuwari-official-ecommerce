@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import {
   Typography,
   Box,
@@ -43,7 +43,7 @@ import {
   Cell,
 } from "recharts";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
-import axios from "axios";
+import { NotificationContext } from "@/context/NotificationContext";
 
 export default function AdminReportsPage() {
   const [reportData, setReportData] = useState(null);
@@ -55,6 +55,7 @@ export default function AdminReportsPage() {
       .split("T")[0],
     endDate: new Date().toISOString().split("T")[0],
   });
+  const { showError } = useContext(NotificationContext);
 
   useEffect(() => {
     fetchReportData();
@@ -68,10 +69,12 @@ export default function AdminReportsPage() {
         startDate: dateRange.startDate,
         endDate: dateRange.endDate,
       });
-
-      const response = await axios.get(`/api/admin/reports?${params}`);
-      setReportData(response.data);
+      const res = await fetch(`/api/admin/reports?${params}`);
+      if (!res.ok) throw new Error("Gagal fetch laporan");
+      const data = await res.json();
+      setReportData(data);
     } catch (error) {
+      showError("Oops! Gagal ambil data laporan, coba refresh dulu 😅");
       console.error("Error fetching report data:", error);
     } finally {
       setLoading(false);

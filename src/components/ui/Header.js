@@ -27,7 +27,7 @@ import { CartContext } from "@/context/CartContext";
 export default function Header() {
   const router = useRouter();
   const { user, logout } = useContext(AuthContext);
-  const { cartItems } = useContext(CartContext);
+  const { cartItems, clearCart } = useContext(CartContext);
   const [anchorEl, setAnchorEl] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -92,16 +92,21 @@ export default function Header() {
         </Box>
 
         <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-          <IconButton color="inherit" onClick={() => router.push("/wishlist")}>
-            <Favorite />
-          </IconButton>
-
-          <IconButton color="inherit" onClick={() => router.push("/cart")}>
-            <Badge badgeContent={cartItemCount} color="error">
-              <ShoppingCart />
-            </Badge>
-          </IconButton>
-
+          {user && (
+            <>
+              <IconButton
+                color="inherit"
+                onClick={() => router.push("/wishlist")}
+              >
+                <Favorite />
+              </IconButton>
+              <IconButton color="inherit" onClick={() => router.push("/cart")}>
+                <Badge badgeContent={cartItemCount} color="error">
+                  <ShoppingCart />
+                </Badge>
+              </IconButton>
+            </>
+          )}
           {user ? (
             <>
               <IconButton color="inherit" onClick={handleMenuOpen}>
@@ -140,6 +145,7 @@ export default function Header() {
                 )}
                 <MenuItem
                   onClick={() => {
+                    clearCart();
                     logout();
                     handleMenuClose();
                   }}

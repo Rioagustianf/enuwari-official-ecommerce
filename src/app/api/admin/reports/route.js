@@ -37,10 +37,13 @@ export async function GET(request) {
 
     let dateFilter = {};
     if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
       dateFilter = {
         createdAt: {
-          gte: new Date(startDate),
-          lte: new Date(endDate),
+          gte: start,
+          lte: end,
         },
       };
     }
@@ -50,15 +53,19 @@ export async function GET(request) {
     switch (type) {
       case "sales":
         reportData = await getSalesReport(dateFilter);
+        reportData = convertBigInt(reportData);
         break;
       case "products":
         reportData = await getProductsReport(dateFilter);
+        reportData = convertBigInt(reportData);
         break;
       case "customers":
         reportData = await getCustomersReport(dateFilter);
+        reportData = convertBigInt(reportData);
         break;
       default:
         reportData = await getSalesReport(dateFilter);
+        reportData = convertBigInt(reportData);
     }
 
     return NextResponse.json(reportData);
@@ -72,6 +79,17 @@ export async function GET(request) {
 }
 
 async function getSalesReport(dateFilter) {
+  // DEBUG: print dateFilter
+  console.log("[REPORT DEBUG] dateFilter:", JSON.stringify(dateFilter));
+
+  // DEBUG: print semua order PAID
+  const paidOrders = await prisma.order.findMany({
+    where: { paymentStatus: "PAID" },
+    select: { id: true, orderNumber: true, createdAt: true, status: true },
+    orderBy: { createdAt: "desc" },
+  });
+  console.log("[REPORT DEBUG] paidOrders:", paidOrders);
+
   const [
     totalSales,
     totalOrders,
@@ -111,22 +129,45 @@ async function getSalesReport(dateFilter) {
     }),
 
     // Daily sales
-    prisma.$queryRaw`
-      SELECT 
-        DATE(createdAt) as date,
-        COUNT(*) as orderCount,
-        SUM(total) as revenue
-      FROM orders 
-      WHERE paymentStatus = 'PAID'
-        ${
-          dateFilter.createdAt
-            ? `AND createdAt >= ${dateFilter.createdAt.gte} AND createdAt <= ${dateFilter.createdAt.lte}`
-            : ""
-        }
-      GROUP BY DATE(createdAt)
-      ORDER BY date ASC
-    `,
+    (() => {
+      if (
+        dateFilter.createdAt &&
+        dateFilter.createdAt.gte &&
+        dateFilter.createdAt.lte
+      ) {
+        return prisma.$queryRaw`
+          SELECT 
+            DATE(createdAt) as date,
+            COUNT(*) as orderCount,
+            SUM(total) as revenue
+          FROM orders 
+          WHERE paymentStatus = 'PAID'
+            AND createdAt >= ${dateFilter.createdAt.gte}
+            AND createdAt <= ${dateFilter.createdAt.lte}
+          GROUP BY DATE(createdAt)
+          ORDER BY date ASC
+        `;
+      } else {
+        return prisma.$queryRaw`
+          SELECT 
+            DATE(createdAt) as date,
+            COUNT(*) as orderCount,
+            SUM(total) as revenue
+          FROM orders 
+          WHERE paymentStatus = 'PAID'
+          GROUP BY DATE(createdAt)
+          ORDER BY date ASC
+        `;
+      }
+    })(),
   ]);
+
+  // DEBUG LOG
+  console.log("[REPORT DEBUG] totalSales:", totalSales);
+  console.log("[REPORT DEBUG] totalOrders:", totalOrders);
+  console.log("[REPORT DEBUG] averageOrderValue:", averageOrderValue);
+  console.log("[REPORT DEBUG] salesByStatus:", salesByStatus);
+  console.log("[REPORT DEBUG] dailySales:", dailySales);
 
   return {
     totalSales: totalSales._sum.total || 0,
@@ -290,4 +331,23 @@ async function getCustomersReport(dateFilter) {
     topCustomers,
     customerGrowth,
   };
+}
+
+function convertBigInt(obj) {
+  if (Array.isArray(obj)) {
+    return obj.map(convertBigInt);
+  } else if (obj && typeof obj === "object") {
+    const newObj = {};
+    for (const key in obj) {
+      if (typeof obj[key] === "bigint") {
+        newObj[key] = Number(obj[key]);
+      } else if (typeof obj[key] === "object") {
+        newObj[key] = convertBigInt(obj[key]);
+      } else {
+        newObj[key] = obj[key];
+      }
+    }
+    return newObj;
+  }
+  return obj;
 }

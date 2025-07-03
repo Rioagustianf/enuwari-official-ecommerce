@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useContext } from "react";
 import {
   Table,
   TableBody,
@@ -33,7 +33,7 @@ import {
   Payment,
 } from "@mui/icons-material";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import { NotificationContext } from "@/context/NotificationContext";
 
 export default function OrderTable({ orders, onOrderUpdate }) {
   const router = useRouter();
@@ -45,15 +45,21 @@ export default function OrderTable({ orders, onOrderUpdate }) {
     paymentStatus: "",
     trackingNumber: "",
   });
+  const [loading, setLoading] = useState(false);
+  const { showError } = useContext(NotificationContext);
 
   const handleMenuOpen = (event, order) => {
+    if (!order || !order.id) {
+      showError && showError("Order tidak valid (ID kosong)");
+      return;
+    }
     setAnchorEl(event.currentTarget);
     setSelectedOrder(order);
   };
 
   const handleMenuClose = () => {
     setAnchorEl(null);
-    setSelectedOrder(null);
+    if (!updateDialog) setSelectedOrder(null);
   };
 
   const handleViewOrder = () => {
@@ -62,6 +68,10 @@ export default function OrderTable({ orders, onOrderUpdate }) {
   };
 
   const handleUpdateOrder = () => {
+    if (!selectedOrder || !selectedOrder.id) {
+      showError && showError("Order tidak valid (ID kosong)");
+      return;
+    }
     setUpdateData({
       status: selectedOrder.status,
       paymentStatus: selectedOrder.paymentStatus,
@@ -72,12 +82,32 @@ export default function OrderTable({ orders, onOrderUpdate }) {
   };
 
   const submitUpdate = async () => {
+    if (!selectedOrder || !selectedOrder.id) {
+      showError && showError("Order tidak valid untuk update");
+      console.error("[DEBUG] selectedOrder null/invalid:", selectedOrder);
+      return;
+    }
+    setLoading(true);
     try {
-      await axios.put(`/api/orders/${selectedOrder.id}`, updateData);
+      console.log("[DEBUG] submitUpdate: selectedOrder", selectedOrder);
+      console.log("[DEBUG] submitUpdate: updateData", updateData);
+      const res = await fetch(`/api/orders/${selectedOrder.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updateData),
+      });
+      const data = await res.json();
+      console.log("[DEBUG] submitUpdate: response", res, data);
+      if (!res.ok) {
+        showError && showError(data.error || "Gagal update order");
+        throw new Error(data.error || "Gagal update order");
+      }
       onOrderUpdate();
       setUpdateDialog(false);
     } catch (error) {
-      console.error("Error updating order:", error);
+      console.error("[DEBUG] Error updating order:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -221,8 +251,11 @@ export default function OrderTable({ orders, onOrderUpdate }) {
 
       {/* Update Order Dialog */}
       <Dialog
-        open={updateDialog}
-        onClose={() => setUpdateDialog(false)}
+        open={updateDialog && !!selectedOrder}
+        onClose={() => {
+          setUpdateDialog(false);
+          setSelectedOrder(null);
+        }}
         maxWidth="sm"
         fullWidth
       >
@@ -276,9 +309,21 @@ export default function OrderTable({ orders, onOrderUpdate }) {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setUpdateDialog(false)}>Batal</Button>
-          <Button onClick={submitUpdate} variant="contained">
-            Update
+          <Button
+            onClick={() => {
+              setUpdateDialog(false);
+              setSelectedOrder(null);
+            }}
+            disabled={loading}
+          >
+            Batal
+          </Button>
+          <Button
+            onClick={submitUpdate}
+            variant="contained"
+            disabled={loading || !selectedOrder}
+          >
+            {loading ? "Menyimpan..." : "Update"}
           </Button>
         </DialogActions>
       </Dialog>

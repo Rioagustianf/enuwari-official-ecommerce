@@ -107,3 +107,63 @@ export async function GET(request) {
     );
   }
 }
+
+export async function PUT(request) {
+  try {
+    const user = await getUserFromToken(request);
+    if (user.role !== "ADMIN") {
+      return NextResponse.json(
+        { error: "Tidak memiliki akses admin" },
+        { status: 403 }
+      );
+    }
+    const body = await request.json();
+    const updateData = {};
+    if (body.name) updateData.name = body.name;
+    // Ganti password
+    if (body.password) {
+      if (!body.oldPassword) {
+        return NextResponse.json(
+          { error: "Password lama wajib diisi" },
+          { status: 400 }
+        );
+      }
+      // Cek password lama
+      const dbUser = await prisma.user.findUnique({
+        where: { id: user.userId },
+      });
+      if (!dbUser) {
+        return NextResponse.json(
+          { error: "User tidak ditemukan" },
+          { status: 404 }
+        );
+      }
+      // Cek password lama (hash compare)
+      const bcrypt = require("bcryptjs");
+      const match = await bcrypt.compare(body.oldPassword, dbUser.password);
+      if (!match) {
+        return NextResponse.json(
+          { error: "Password lama salah" },
+          { status: 400 }
+        );
+      }
+      // Hash password baru
+      const hashed = await bcrypt.hash(body.password, 10);
+      updateData.password = hashed;
+    }
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        { error: "Tidak ada data yang diupdate" },
+        { status: 400 }
+      );
+    }
+    await prisma.user.update({
+      where: { id: user.userId },
+      data: updateData,
+    });
+    return NextResponse.json({ message: "Update admin berhasil" });
+  } catch (error) {
+    console.error("Error updating admin:", error);
+    return NextResponse.json({ error: "Gagal update admin" }, { status: 500 });
+  }
+}

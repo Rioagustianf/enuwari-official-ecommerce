@@ -44,14 +44,23 @@ axios.interceptors.response.use(
   },
   (error) => {
     if (process.env.NODE_ENV === "development") {
-      console.error("Axios Response Error:", {
-        message: error.message,
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        url: error.config?.url,
-        data: error.response?.data,
-        requestData: error.config?.data,
-      });
+      if (error.response) {
+        console.error("Axios Response Error:", {
+          message: error.message,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          url: error.config?.url,
+          data: error.response?.data,
+          requestData: error.config?.data,
+        });
+      } else {
+        // Network error atau tidak ada response sama sekali
+        console.error("Axios Response Error (No Response):", {
+          message: error.message,
+          url: error.config?.url,
+          requestData: error.config?.data,
+        });
+      }
     }
     return Promise.reject(error);
   }

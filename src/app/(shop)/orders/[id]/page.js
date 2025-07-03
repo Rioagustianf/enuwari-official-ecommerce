@@ -25,7 +25,6 @@ import Footer from "@/components/ui/Footer";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { AuthContext } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import axios from "axios";
 
 export default function OrderDetailPage({ params }) {
   // Use React.use() to unwrap params
@@ -65,8 +64,10 @@ export default function OrderDetailPage({ params }) {
 
   const fetchOrder = async () => {
     try {
-      const response = await axios.get(`/api/orders/${resolvedParams.id}`);
-      setOrder(response.data);
+      const res = await fetch(`/api/orders/${resolvedParams.id}`);
+      if (!res.ok) throw new Error("Gagal fetch pesanan");
+      const data = await res.json();
+      setOrder(data);
     } catch (error) {
       console.error("Error fetching order:", error);
       if (error.response?.status === 404) {

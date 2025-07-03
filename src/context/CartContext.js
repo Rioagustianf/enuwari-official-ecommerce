@@ -1,6 +1,7 @@
 "use client";
-import { createContext, useReducer, useEffect } from "react";
+import { createContext, useReducer, useEffect, useContext } from "react";
 import { toast } from "react-hot-toast";
+import { AuthContext } from "@/context/AuthContext";
 
 const CartContext = createContext();
 
@@ -46,20 +47,67 @@ const cartReducer = (state, action) => {
 };
 
 export function CartProvider({ children }) {
+  const { user } = useContext(AuthContext);
   const [cartItems, dispatch] = useReducer(cartReducer, []);
 
   useEffect(() => {
-    const savedCart = localStorage.getItem("cart");
-    if (savedCart) {
-      dispatch({ type: "LOAD_CART", payload: JSON.parse(savedCart) });
-    }
-  }, []);
+    const fetchCartFromDB = async () => {
+      if (user) {
+        try {
+          const res = await fetch("/api/cart");
+          if (res.ok) {
+            const dbCart = await res.json();
+            const localCart = JSON.parse(localStorage.getItem("cart") || "[]");
+            const merged = mergeCart(localCart, dbCart);
+            dispatch({ type: "LOAD_CART", payload: merged });
+            localStorage.setItem("cart", JSON.stringify(merged));
+            for (const item of merged) {
+              await fetch("/api/cart", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  productId: item.productId,
+                  quantity: item.quantity,
+                  size: item.size,
+                }),
+              });
+            }
+          }
+        } catch (err) {
+          // ignore
+        }
+      } else {
+        const savedCart = localStorage.getItem("cart");
+        if (savedCart) {
+          dispatch({ type: "LOAD_CART", payload: JSON.parse(savedCart) });
+        }
+      }
+    };
+    fetchCartFromDB();
+  }, [user]);
 
   useEffect(() => {
     localStorage.setItem("cart", JSON.stringify(cartItems));
   }, [cartItems]);
 
-  const addToCart = (product, quantity = 1, size = null) => {
+  function mergeCart(local, db) {
+    const map = new Map();
+    [...local, ...db].forEach((item) => {
+      const key = `${item.productId}-${item.size || "default"}`;
+      if (!map.has(key)) {
+        map.set(key, { ...item });
+      } else {
+        const prev = map.get(key);
+        map.set(key, {
+          ...item,
+          quantity: Math.max(prev.quantity, item.quantity),
+        });
+      }
+    });
+    return Array.from(map.values());
+  }
+
+  const addToCart = async (product, quantity = 1, size = null) => {
     const cartItem = {
       id: `${product.id}-${size || "default"}`,
       productId: product.id,
@@ -70,26 +118,60 @@ export function CartProvider({ children }) {
       size,
       stock: product.stock,
     };
-
     dispatch({ type: "ADD_TO_CART", payload: cartItem });
     toast.success("Produk ditambahkan ke keranjang");
+    if (user) {
+      await fetch("/api/cart", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: product.id,
+          quantity,
+          size,
+        }),
+      });
+    }
   };
 
-  const updateQuantity = (id, quantity) => {
+  const updateQuantity = async (id, quantity) => {
     if (quantity <= 0) {
       removeFromCart(id);
       return;
     }
     dispatch({ type: "UPDATE_QUANTITY", payload: { id, quantity } });
+    if (user) {
+      const item = cartItems.find((i) => i.id === id);
+      if (item) {
+        await fetch("/api/cart", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            cartItemId: item.dbId || item.id,
+            quantity,
+          }),
+        });
+      }
+    }
   };
 
-  const removeFromCart = (id) => {
+  const removeFromCart = async (id) => {
     dispatch({ type: "REMOVE_FROM_CART", payload: { id } });
     toast.success("Produk dihapus dari keranjang");
+    if (user) {
+      const item = cartItems.find((i) => i.id === id);
+      if (item) {
+        await fetch(`/api/cart?id=${item.dbId || item.id}`, {
+          method: "DELETE",
+        });
+      }
+    }
   };
 
-  const clearCart = () => {
+  const clearCart = async () => {
     dispatch({ type: "CLEAR_CART" });
+    if (user) {
+      await fetch("/api/cart", { method: "DELETE" });
+    }
   };
 
   const getCartTotal = () => {

@@ -120,7 +120,7 @@ export default function CartPage() {
                           </Typography>
                         )}
                         <Typography variant="h6" color="primary">
-                          Rp {item.price.toLocaleString("id-ID")}
+                          Rp {Number(item.price || 0).toLocaleString("id-ID")}
                         </Typography>
                       </Box>
 
@@ -161,7 +161,11 @@ export default function CartPage() {
                       <Box sx={{ textAlign: "right", mr: 2 }}>
                         <Typography variant="h6" fontWeight="bold">
                           Rp{" "}
-                          {(item.price * item.quantity).toLocaleString("id-ID")}
+                          {Number(item.price || 0) * item.quantity > 0
+                            ? (
+                                Number(item.price) * item.quantity
+                              ).toLocaleString("id-ID")
+                            : "0"}
                         </Typography>
                       </Box>
 
@@ -206,7 +210,11 @@ export default function CartPage() {
                         </Typography>
                         <Typography variant="body2">
                           Rp{" "}
-                          {(item.price * item.quantity).toLocaleString("id-ID")}
+                          {Number(item.price || 0) * item.quantity > 0
+                            ? (
+                                Number(item.price) * item.quantity
+                              ).toLocaleString("id-ID")
+                            : "0"}
                         </Typography>
                       </Box>
                     ))}

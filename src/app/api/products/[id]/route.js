@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 export async function GET(request, { params }) {
   try {
-    const { id } = await params;
+    const { id } = params;
 
     const product = await prisma.product.findUnique({
       where: { id },
@@ -56,17 +56,57 @@ export async function PUT(request, { params }) {
     const { id } = params;
     const data = await request.json();
 
-    const product = await prisma.product.update({
-      where: { id },
-      data: {
-        ...data,
-        slug: data.name
-          ? data.name.toLowerCase().replace(/\s+/g, "-")
-          : undefined,
-      },
+    // Mapping data update
+    const updateData = {
+      name: data.name,
+      description: data.description || null,
+      price: data.price ? parseFloat(data.price) : null,
+      salePrice: data.salePrice ? parseFloat(data.salePrice) : null,
+      sku: data.sku,
+      stock: data.stock ? parseInt(data.stock) : 0,
+      weight: data.weight ? parseInt(data.weight) : null,
+      dimensions: data.dimensions || null,
+      images: data.images,
+      isActive:
+        typeof data.isActive === "boolean"
+          ? data.isActive
+          : data.isActive === "true",
+      isFeatured:
+        typeof data.isFeatured === "boolean"
+          ? data.isFeatured
+          : data.isFeatured === "true",
+      slug: data.name
+        ? data.name.toLowerCase().replace(/\s+/g, "-")
+        : undefined,
+    };
+    if (data.categoryId) {
+      updateData.category = { connect: { id: data.categoryId } };
+    }
+
+    // Update produk dan ukuran dalam transaction
+    const result = await prisma.$transaction(async (tx) => {
+      const product = await tx.product.update({
+        where: { id },
+        data: updateData,
+      });
+      if (data.sizes && Array.isArray(data.sizes)) {
+        // Hapus semua ukuran lama
+        await tx.productSize.deleteMany({ where: { productId: id } });
+        // Insert ulang ukuran baru
+        if (data.sizes.length > 0) {
+          await tx.productSize.createMany({
+            data: data.sizes.map((size) => ({
+              productId: id,
+              size: size.size,
+              stock: parseInt(size.stock) || 0,
+            })),
+          });
+        }
+      }
+      return product;
     });
 
-    return NextResponse.json(product);
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error updating product:", error);
     return NextResponse.json(

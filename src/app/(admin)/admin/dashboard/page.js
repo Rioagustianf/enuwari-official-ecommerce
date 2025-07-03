@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import {
   Typography,
   Grid,
@@ -47,13 +47,14 @@ import {
 } from "recharts";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import { NotificationContext } from "@/context/NotificationContext";
 
 export default function AdminDashboard() {
   const router = useRouter();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const isTablet = useMediaQuery(theme.breakpoints.down("md"));
+  const { showError } = useContext(NotificationContext);
 
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -67,22 +68,20 @@ export default function AdminDashboard() {
     setLoading(true);
     setError(null);
     try {
-      const response = await axios.get("/api/admin/dashboard", {
-        timeout: 30000,
-        headers: {
-          "Content-Type": "application/json",
-        },
+      const res = await fetch("/api/admin/dashboard", {
+        headers: { "Content-Type": "application/json" },
       });
-      if (response.data.success) {
-        setDashboardData(response.data);
+      if (!res.ok) throw new Error("Gagal fetch dashboard");
+      const data = await res.json();
+      if (data.success) {
+        setDashboardData(data);
       } else {
         throw new Error("Invalid response format");
       }
     } catch (error) {
+      showError("Oops! Gagal ambil data dashboard, coba refresh dulu ��");
+      setError(error.message || "Gagal memuat dashboard");
       console.error("Error fetching dashboard data:", error);
-      setError(
-        error.response?.data?.error || error.message || "Gagal memuat dashboard"
-      );
     } finally {
       setLoading(false);
     }

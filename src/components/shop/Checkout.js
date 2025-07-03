@@ -30,6 +30,7 @@ import { CartContext } from "@/context/CartContext";
 import { AuthContext } from "@/context/AuthContext";
 import axios from "axios";
 import { useRouter } from "next/navigation";
+import { NotificationContext } from "@/context/NotificationContext";
 
 const steps = [
   "Informasi Pengiriman",
@@ -44,6 +45,12 @@ export default function Checkout() {
   const { user } = useContext(AuthContext);
   const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError, setPromoError] = useState("");
+  const [promoSuccess, setPromoSuccess] = useState("");
+  const [promo, setPromo] = useState(null);
+  const { showError, showSuccess } = useContext(NotificationContext);
 
   // Shipping Information State
   const [shippingData, setShippingData] = useState({
@@ -311,7 +318,38 @@ export default function Checkout() {
 
   const subtotal = getCartTotal();
   const shippingCost = selectedShipping ? selectedShipping.cost : 0;
-  const total = subtotal + shippingCost;
+  const total = subtotal + shippingCost - (promo?.discount || 0);
+
+  const handleApplyPromo = async () => {
+    setPromoLoading(true);
+    setPromoError("");
+    setPromoSuccess("");
+    try {
+      const res = await fetch("/api/promotions/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: promoCode, orderTotal: subtotal }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Kode promo tidak valid");
+      setPromo({
+        ...data.promotion,
+        discount: data.discountAmount,
+      });
+      setPromoSuccess(
+        `Promo berhasil! Diskon: Rp ${data.discountAmount.toLocaleString(
+          "id-ID"
+        )}`
+      );
+      showSuccess && showSuccess("Promo berhasil diterapkan!");
+    } catch (err) {
+      setPromo(null);
+      setPromoError(err.message);
+      showError && showError(err.message);
+    } finally {
+      setPromoLoading(false);
+    }
+  };
 
   const renderStepContent = (step) => {
     switch (step) {
@@ -587,6 +625,16 @@ export default function Checkout() {
                   <Typography>Subtotal:</Typography>
                   <Typography>Rp {subtotal.toLocaleString("id-ID")}</Typography>
                 </Box>
+                {promo && promo.discount > 0 && (
+                  <Box
+                    sx={{ display: "flex", justifyContent: "space-between" }}
+                  >
+                    <Typography color="primary">Diskon Promo:</Typography>
+                    <Typography color="primary">
+                      - Rp {promo.discount.toLocaleString("id-ID")}
+                    </Typography>
+                  </Box>
+                )}
                 <Box
                   sx={{
                     display: "flex",
@@ -606,6 +654,54 @@ export default function Checkout() {
                     Rp {total.toLocaleString("id-ID")}
                   </Typography>
                 </Box>
+              </CardContent>
+            </Card>
+
+            {/* Input Promo */}
+            <Card variant="outlined" sx={{ mb: 3 }}>
+              <CardContent>
+                <Typography variant="subtitle1" gutterBottom>
+                  Kode Promo
+                </Typography>
+                <Box
+                  sx={{ display: "flex", gap: 2, alignItems: "center", mb: 1 }}
+                >
+                  <TextField
+                    label="Masukkan kode promo"
+                    value={promoCode}
+                    onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                    disabled={promoLoading}
+                    sx={{ flex: 1 }}
+                  />
+                  <Button
+                    variant="contained"
+                    onClick={handleApplyPromo}
+                    disabled={promoLoading || !promoCode}
+                  >
+                    {promoLoading ? "Cek..." : "Terapkan"}
+                  </Button>
+                </Box>
+                {promoError && (
+                  <Typography color="error" variant="body2">
+                    {promoError}
+                  </Typography>
+                )}
+                {promoSuccess && (
+                  <Typography color="success.main" variant="body2">
+                    {promoSuccess}
+                  </Typography>
+                )}
+                {promo && (
+                  <Box sx={{ mt: 1 }}>
+                    <Typography variant="body2" color="primary">
+                      {promo.name} - {promo.code} (
+                      {promo.type === "PERCENTAGE"
+                        ? `${promo.value}%`
+                        : `Rp ${promo.value.toLocaleString("id-ID")}`}
+                      )
+                    </Typography>
+                  </Box>
+                )}
               </CardContent>
             </Card>
           </Box>

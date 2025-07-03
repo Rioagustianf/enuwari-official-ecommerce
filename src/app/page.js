@@ -62,29 +62,90 @@ export default function HomePage() {
       {/* Hero Banner */}
       <Box sx={{ mb: 4 }}>
         {banners.length > 0 && (
-          <Card>
-            <CardMedia
-              component="img"
-              height="400"
-              image={banners[0].image}
+          <Box
+            sx={{
+              position: "relative",
+              borderRadius: 4,
+              overflow: "hidden",
+              boxShadow: 3,
+              cursor: banners[0].link ? "pointer" : "default",
+              transition: "transform 0.2s",
+              "&:hover": {
+                transform: banners[0].link ? "scale(1.01)" : "none",
+              },
+            }}
+            onClick={() => {
+              if (banners[0].link) {
+                if (banners[0].link.startsWith("http")) {
+                  window.open(banners[0].link, "_blank");
+                } else {
+                  router.push(banners[0].link);
+                }
+              }
+            }}
+          >
+            <img
+              src={banners[0].image}
               alt={banners[0].title}
+              style={{
+                width: "100%",
+                height: 400,
+                objectFit: "cover",
+                display: "block",
+                filter: "brightness(0.7)",
+                transition: "filter 0.2s",
+              }}
             />
-            <CardContent sx={{ textAlign: "center" }}>
-              <Typography variant="h3" gutterBottom>
+            <Box
+              sx={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: "100%",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "#fff",
+                textShadow: "0 2px 16px rgba(0,0,0,0.5)",
+                px: 2,
+              }}
+            >
+              <Typography
+                variant="h3"
+                sx={{
+                  fontWeight: 900,
+                  letterSpacing: 1,
+                  mb: 1,
+                  fontSize: { xs: 28, md: 48 },
+                  textAlign: "center",
+                  textTransform: "uppercase",
+                  background: "linear-gradient(90deg, #ff6f61, #5f2eea)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.3))",
+                }}
+              >
                 {banners[0].title}
               </Typography>
-              <Typography variant="h6" color="text.secondary" gutterBottom>
-                {banners[0].subtitle}
-              </Typography>
-              <Button
-                variant="contained"
-                size="large"
-                onClick={() => router.push("/products")}
-              >
-                Belanja Sekarang
-              </Button>
-            </CardContent>
-          </Card>
+              {banners[0].subtitle && (
+                <Typography
+                  variant="h6"
+                  sx={{
+                    mb: 2,
+                    fontWeight: 400,
+                    fontSize: { xs: 16, md: 24 },
+                    textAlign: "center",
+                    color: "#fff",
+                    opacity: 0.95,
+                  }}
+                >
+                  {banners[0].subtitle}
+                </Typography>
+              )}
+            </Box>
+          </Box>
         )}
       </Box>
 

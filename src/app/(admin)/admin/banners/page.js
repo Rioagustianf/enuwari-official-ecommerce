@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext, useRef } from "react";
 import {
   Typography,
   Box,
@@ -34,7 +34,7 @@ import {
   Visibility,
 } from "@mui/icons-material";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
-import axios from "axios";
+import { NotificationContext } from "@/context/NotificationContext";
 
 export default function AdminBannersPage() {
   const [banners, setBanners] = useState([]);
@@ -52,6 +52,9 @@ export default function AdminBannersPage() {
     order: 0,
     isActive: true,
   });
+  const { showError } = useContext(NotificationContext);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef();
 
   useEffect(() => {
     fetchBanners();
@@ -60,9 +63,12 @@ export default function AdminBannersPage() {
   const fetchBanners = async () => {
     setLoading(true);
     try {
-      const response = await axios.get("/api/banners");
-      setBanners(response.data);
+      const res = await fetch("/api/banners");
+      if (!res.ok) throw new Error("Gagal fetch banner");
+      const data = await res.json();
+      setBanners(data);
     } catch (error) {
+      showError("Oops! Gagal ambil data banner, coba refresh dulu 😅");
       console.error("Error fetching banners:", error);
     } finally {
       setLoading(false);
@@ -99,14 +105,24 @@ export default function AdminBannersPage() {
   const handleSubmit = async () => {
     try {
       if (dialog.mode === "create") {
-        await axios.post("/api/banners", formData);
+        const res = await fetch("/api/banners", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+        if (!res.ok) throw new Error("Gagal simpan banner");
       } else {
-        await axios.put(`/api/banners/${dialog.data.id}`, formData);
+        const res = await fetch(`/api/banners/${dialog.data.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(formData),
+        });
+        if (!res.ok) throw new Error("Gagal update banner");
       }
-
       fetchBanners();
       handleCloseDialog();
     } catch (error) {
+      showError("Yah, gagal simpan banner. Coba lagi bentar ya!");
       console.error("Error saving banner:", error);
     }
   };
@@ -114,9 +130,13 @@ export default function AdminBannersPage() {
   const handleDelete = async (bannerId) => {
     if (window.confirm("Apakah Anda yakin ingin menghapus banner ini?")) {
       try {
-        await axios.delete(`/api/banners/${bannerId}`);
+        const res = await fetch(`/api/banners/${bannerId}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) throw new Error("Gagal hapus banner");
         fetchBanners();
       } catch (error) {
+        showError("Gagal hapus banner, servernya lagi ngambek 😭");
         console.error("Error deleting banner:", error);
       }
     }
@@ -124,10 +144,43 @@ export default function AdminBannersPage() {
 
   const moveOrder = async (bannerId, direction) => {
     try {
-      await axios.put(`/api/banners/${bannerId}/order`, { direction });
+      const res = await fetch(`/api/banners/${bannerId}/order`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ direction }),
+      });
+      if (!res.ok) throw new Error("Gagal update urutan");
       fetchBanners();
     } catch (error) {
+      showError("Update urutan gagal, coba refresh!");
       console.error("Error updating banner order:", error);
+    }
+  };
+
+  // Handler upload gambar banner
+  const handleImageChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      showError("File harus berupa gambar!");
+      return;
+    }
+    setUploading(true);
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append("images", file);
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formDataUpload,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Gagal upload gambar");
+      setFormData((prev) => ({ ...prev, image: data.files?.[0] || "" }));
+    } catch (error) {
+      showError("Gagal upload gambar banner!");
+      console.error("Upload banner error:", error);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -315,16 +368,42 @@ export default function AdminBannersPage() {
               />
             </Grid>
             <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="URL Gambar"
-                value={formData.image}
-                onChange={(e) =>
-                  setFormData({ ...formData, image: e.target.value })
-                }
-                required
-                helperText="URL gambar banner (disarankan ukuran 1200x400px)"
-              />
+              <Button
+                variant="outlined"
+                component="label"
+                disabled={uploading}
+                startIcon={<ViewCarousel />}
+              >
+                {uploading
+                  ? "Mengupload..."
+                  : formData.image
+                  ? "Ganti Gambar"
+                  : "Upload Gambar"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  ref={fileInputRef}
+                  onChange={handleImageChange}
+                />
+              </Button>
+              {formData.image && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="subtitle2" gutterBottom>
+                    Preview:
+                  </Typography>
+                  <img
+                    src={formData.image}
+                    alt="Banner preview"
+                    style={{
+                      width: "100%",
+                      maxHeight: "200px",
+                      objectFit: "cover",
+                      borderRadius: "8px",
+                    }}
+                  />
+                </Box>
+              )}
             </Grid>
             <Grid item xs={12}>
               <TextField
@@ -362,23 +441,6 @@ export default function AdminBannersPage() {
                 label="Banner Aktif"
               />
             </Grid>
-            {formData.image && (
-              <Grid item xs={12}>
-                <Typography variant="subtitle2" gutterBottom>
-                  Preview:
-                </Typography>
-                <img
-                  src={formData.image}
-                  alt="Banner preview"
-                  style={{
-                    width: "100%",
-                    maxHeight: "200px",
-                    objectFit: "cover",
-                    borderRadius: "8px",
-                  }}
-                />
-              </Grid>
-            )}
           </Grid>
         </DialogContent>
         <DialogActions>

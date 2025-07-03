@@ -324,6 +324,7 @@ export default function AdminSidebar({
                   bgcolor: alpha(theme.palette.common.white, 0.1),
                 },
               }}
+              onClick={() => handleNavigation("/admin/settings")}
             >
               <ListItemIcon sx={{ color: "white", minWidth: 40 }}>
                 <Settings />
@@ -584,6 +585,7 @@ export default function AdminSidebar({
                   bgcolor: alpha(theme.palette.common.white, 0.1),
                 },
               }}
+              onClick={() => handleNavigation("/admin/settings")}
             >
               <ListItemIcon sx={{ color: "white", minWidth: 40 }}>
                 <Settings />

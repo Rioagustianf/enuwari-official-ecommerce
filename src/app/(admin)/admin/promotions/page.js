@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import {
   Typography,
   Box,
@@ -35,7 +35,7 @@ import {
   ContentCopy,
 } from "@mui/icons-material";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
-import axios from "axios";
+import { NotificationContext } from "@/context/NotificationContext";
 
 export default function AdminPromotionsPage() {
   const [promotions, setPromotions] = useState([]);
@@ -57,6 +57,7 @@ export default function AdminPromotionsPage() {
     usageLimit: "",
     isActive: true,
   });
+  const { showError } = useContext(NotificationContext);
 
   useEffect(() => {
     fetchPromotions();
@@ -65,9 +66,12 @@ export default function AdminPromotionsPage() {
   const fetchPromotions = async () => {
     setLoading(true);
     try {
-      const response = await axios.get("/api/promotions");
-      setPromotions(response.data);
+      const res = await fetch("/api/promotions");
+      if (!res.ok) throw new Error("Gagal fetch promosi");
+      const data = await res.json();
+      setPromotions(data);
     } catch (error) {
+      showError("Oops! Gagal ambil data promosi, coba refresh dulu 😅");
       console.error("Error fetching promotions:", error);
     } finally {
       setLoading(false);
@@ -122,16 +126,25 @@ export default function AdminPromotionsPage() {
           : null,
         usageLimit: formData.usageLimit ? parseInt(formData.usageLimit) : null,
       };
-
       if (dialog.mode === "create") {
-        await axios.post("/api/promotions", submitData);
+        const res = await fetch("/api/promotions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(submitData),
+        });
+        if (!res.ok) throw new Error("Gagal simpan promosi");
       } else {
-        await axios.put(`/api/promotions/${dialog.data.id}`, submitData);
+        const res = await fetch(`/api/promotions/${dialog.data.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(submitData),
+        });
+        if (!res.ok) throw new Error("Gagal update promosi");
       }
-
       fetchPromotions();
       handleCloseDialog();
     } catch (error) {
+      showError("Yah, gagal simpan promosi. Coba lagi bentar ya!");
       console.error("Error saving promotion:", error);
     }
   };
@@ -139,9 +152,13 @@ export default function AdminPromotionsPage() {
   const handleDelete = async (promotionId) => {
     if (window.confirm("Apakah Anda yakin ingin menghapus promosi ini?")) {
       try {
-        await axios.delete(`/api/promotions/${promotionId}`);
+        const res = await fetch(`/api/promotions/${promotionId}`, {
+          method: "DELETE",
+        });
+        if (!res.ok) throw new Error("Gagal hapus promosi");
         fetchPromotions();
       } catch (error) {
+        showError("Gagal hapus promosi, servernya lagi ngambek 😭");
         console.error("Error deleting promotion:", error);
       }
     }

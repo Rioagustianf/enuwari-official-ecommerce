@@ -30,7 +30,6 @@ import Header from "@/components/ui/Header";
 import Footer from "@/components/ui/Footer";
 import { AuthContext } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import axios from "axios";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 
 export default function ProfilePage() {
@@ -68,14 +67,19 @@ export default function ProfilePage() {
     e.preventDefault();
     setLoading(true);
     setMessage("");
-
     try {
-      const response = await axios.put("/api/user/profile", profileData);
-      updateUser(response.data.user);
+      const res = await fetch("/api/user/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(profileData),
+      });
+      if (!res.ok) throw new Error("Gagal update profil");
+      const data = await res.json();
+      updateUser(data.user);
       setEditing(false);
       setMessage("Profil berhasil diperbarui");
     } catch (error) {
-      setMessage(error.response?.data?.error || "Terjadi kesalahan");
+      setMessage(error.message || "Terjadi kesalahan");
     } finally {
       setLoading(false);
     }
@@ -85,18 +89,21 @@ export default function ProfilePage() {
     e.preventDefault();
     setLoading(true);
     setMessage("");
-
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setMessage("Password baru tidak cocok");
       setLoading(false);
       return;
     }
-
     try {
-      await axios.put("/api/user/password", {
-        currentPassword: passwordData.currentPassword,
-        newPassword: passwordData.newPassword,
+      const res = await fetch("/api/user/password", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword,
+        }),
       });
+      if (!res.ok) throw new Error("Gagal update password");
       setPasswordData({
         currentPassword: "",
         newPassword: "",
@@ -104,7 +111,7 @@ export default function ProfilePage() {
       });
       setMessage("Password berhasil diperbarui");
     } catch (error) {
-      setMessage(error.response?.data?.error || "Terjadi kesalahan");
+      setMessage(error.message || "Terjadi kesalahan");
     } finally {
       setLoading(false);
     }

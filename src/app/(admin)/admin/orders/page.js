@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import {
   Typography,
   Box,
@@ -16,7 +16,7 @@ import { Search } from "@mui/icons-material";
 import OrderTable from "@/components/admin/OrderTable";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import Pagination from "@/components/common/Pagination";
-import axios from "axios";
+import { NotificationContext } from "@/context/NotificationContext";
 
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
@@ -39,6 +39,8 @@ export default function AdminOrdersPage() {
     { label: "Selesai", value: "DELIVERED" },
   ];
 
+  const { showError } = useContext(NotificationContext);
+
   useEffect(() => {
     fetchOrders();
   }, [activeTab, searchQuery, pagination.page]);
@@ -59,14 +61,18 @@ export default function AdminOrdersPage() {
         params.append("search", searchQuery);
       }
 
-      const response = await axios.get(`/api/orders?${params}`);
-      setOrders(response.data.orders);
+      const res = await fetch(`/api/orders?${params}`);
+      if (!res.ok) throw new Error("Gagal fetch pesanan");
+      const data = await res.json();
+      const filteredOrders = (data.orders || []).filter((o) => o && o.id);
+      setOrders(filteredOrders);
       setPagination((prev) => ({
         ...prev,
-        total: response.data.pagination.total,
-        totalPages: response.data.pagination.totalPages,
+        total: data.pagination.total,
+        totalPages: data.pagination.totalPages,
       }));
     } catch (error) {
+      showError("Oops! Gagal ambil data pesanan, coba refresh dulu 😅");
       console.error("Error fetching orders:", error);
     } finally {
       setLoading(false);

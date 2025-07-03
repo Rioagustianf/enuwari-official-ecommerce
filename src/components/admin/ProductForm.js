@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useContext } from "react";
 import {
   Box,
   Card,
@@ -21,6 +21,7 @@ import {
 import { Add, Delete, CloudUpload } from "@mui/icons-material";
 import { useRouter } from "next/navigation";
 import axios from "axios";
+import { NotificationContext } from "@/context/NotificationContext";
 
 export default function ProductForm({ product = null, isEdit = false }) {
   const router = useRouter();
@@ -43,10 +44,31 @@ export default function ProductForm({ product = null, isEdit = false }) {
   });
   const [newSize, setNewSize] = useState({ size: "", stock: "" });
   const [error, setError] = useState("");
+  const { showError } = useContext(NotificationContext);
 
   useEffect(() => {
     fetchCategories();
     if (product) {
+      let imagesArr = [];
+      if (Array.isArray(product.images)) {
+        imagesArr = product.images.filter(
+          (img) => typeof img === "string" && img.trim() !== ""
+        );
+      } else if (
+        typeof product.images === "string" &&
+        product.images.trim() !== ""
+      ) {
+        try {
+          const parsed = JSON.parse(product.images);
+          imagesArr = Array.isArray(parsed)
+            ? parsed.filter(
+                (img) => typeof img === "string" && img.trim() !== ""
+              )
+            : [];
+        } catch {
+          imagesArr = [];
+        }
+      }
       setFormData({
         name: product.name || "",
         description: product.description || "",
@@ -57,9 +79,10 @@ export default function ProductForm({ product = null, isEdit = false }) {
         weight: product.weight || "",
         dimensions: product.dimensions || "",
         categoryId: product.categoryId || "",
-        isActive: product.isActive || true,
-        isFeatured: product.isFeatured || false,
-        images: product.images ? JSON.parse(product.images) : [],
+        isActive: product.isActive !== undefined ? product.isActive : true,
+        isFeatured:
+          product.isFeatured !== undefined ? product.isFeatured : false,
+        images: imagesArr,
         sizes: product.productSizes || [],
       });
     }
@@ -81,14 +104,39 @@ export default function ProductForm({ product = null, isEdit = false }) {
     }));
   };
 
-  const handleImageUpload = (event) => {
+  const handleImageUpload = async (event) => {
     const files = Array.from(event.target.files);
-    // Simulate image upload - in real app, upload to cloud storage
-    const imageUrls = files.map((file) => URL.createObjectURL(file));
-    setFormData((prev) => ({
-      ...prev,
-      images: [...prev.images, ...imageUrls],
-    }));
+    if (!files.length) return;
+    const formDataUpload = new FormData();
+    files.forEach((file) => formDataUpload.append("images", file));
+    try {
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formDataUpload,
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "Gagal upload gambar");
+      }
+      const data = await res.json();
+      const uploadedUrls = data.files;
+      setFormData((prev) => {
+        // Gabungkan gambar lama dan baru, lalu filter duplikat
+        const merged = [...prev.images, ...uploadedUrls].filter(
+          (img, idx, arr) =>
+            typeof img === "string" &&
+            img.trim() !== "" &&
+            arr.indexOf(img) === idx
+        );
+        return {
+          ...prev,
+          images: merged,
+        };
+      });
+    } catch (err) {
+      const msg = err.message || "Gagal upload gambar";
+      if (showError) showError(msg);
+    }
   };
 
   const removeImage = (index) => {
@@ -118,7 +166,7 @@ export default function ProductForm({ product = null, isEdit = false }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
+    setError(null);
 
     try {
       const submitData = {
@@ -128,6 +176,8 @@ export default function ProductForm({ product = null, isEdit = false }) {
         stock: parseInt(formData.stock),
         weight: formData.weight ? parseInt(formData.weight) : null,
         images: JSON.stringify(formData.images),
+        isActive: Boolean(formData.isActive),
+        isFeatured: Boolean(formData.isFeatured),
       };
 
       if (isEdit) {
@@ -138,7 +188,12 @@ export default function ProductForm({ product = null, isEdit = false }) {
 
       router.push("/admin/products");
     } catch (error) {
-      setError(error.response?.data?.error || "Terjadi kesalahan");
+      const msg =
+        error.response?.data?.error ||
+        error.message ||
+        "Terjadi kesalahan saat menambah produk. Coba lagi nanti!";
+      setError(msg);
+      if (showError) showError(msg);
     } finally {
       setLoading(false);
     }
@@ -294,34 +349,36 @@ export default function ProductForm({ product = null, isEdit = false }) {
               </Button>
 
               <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
-                {formData.images.map((image, index) => (
-                  <Box key={index} sx={{ position: "relative" }}>
-                    <img
-                      src={image}
-                      alt={`Product ${index + 1}`}
-                      style={{
-                        width: 100,
-                        height: 100,
-                        objectFit: "cover",
-                        borderRadius: 8,
-                      }}
-                    />
-                    <IconButton
-                      size="small"
-                      onClick={() => removeImage(index)}
-                      sx={{
-                        position: "absolute",
-                        top: -8,
-                        right: -8,
-                        bgcolor: "error.main",
-                        color: "white",
-                        "&:hover": { bgcolor: "error.dark" },
-                      }}
-                    >
-                      <Delete fontSize="small" />
-                    </IconButton>
-                  </Box>
-                ))}
+                {(Array.isArray(formData.images) ? formData.images : []).map(
+                  (image, index) => (
+                    <Box key={index} sx={{ position: "relative" }}>
+                      <img
+                        src={image}
+                        alt={`Product ${index + 1}`}
+                        style={{
+                          width: 100,
+                          height: 100,
+                          objectFit: "cover",
+                          borderRadius: 8,
+                        }}
+                      />
+                      <IconButton
+                        size="small"
+                        onClick={() => removeImage(index)}
+                        sx={{
+                          position: "absolute",
+                          top: -8,
+                          right: -8,
+                          bgcolor: "error.main",
+                          color: "white",
+                          "&:hover": { bgcolor: "error.dark" },
+                        }}
+                      >
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  )
+                )}
               </Box>
             </Grid>
 

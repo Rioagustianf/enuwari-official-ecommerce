@@ -35,7 +35,6 @@ import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { AuthContext } from "@/context/AuthContext";
 import { NotificationContext } from "@/context/NotificationContext";
 import { useRouter } from "next/navigation";
-import axios from "axios";
 
 export default function OrdersPage() {
   const router = useRouter();
@@ -74,8 +73,10 @@ export default function OrdersPage() {
     try {
       const status = statusTabs[activeTab].value;
       const params = status ? `?status=${status}` : "";
-      const response = await axios.get(`/api/orders${params}`);
-      setOrders(response.data.orders);
+      const res = await fetch(`/api/orders${params}`);
+      if (!res.ok) throw new Error("Gagal fetch pesanan");
+      const data = await res.json();
+      setOrders(data.orders);
     } catch (error) {
       console.error("Error fetching orders:", error);
     }
@@ -141,15 +142,8 @@ export default function OrdersPage() {
       showError("Mohon tulis komentar ulasan");
       return;
     }
-
     setReviewLoading(true);
     try {
-      console.log("Submitting review:", {
-        product: reviewDialog.product,
-        productId: reviewDialog.product?.id || reviewDialog.product?.productId,
-        rating: newReview.rating,
-        comment: newReview.comment,
-      });
       const productId =
         reviewDialog.product?.id || reviewDialog.product?.productId;
       if (!productId) {
@@ -159,37 +153,26 @@ export default function OrdersPage() {
         setReviewLoading(false);
         return;
       }
-
-      const response = await axios.post(
-        "/api/reviews",
-        {
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           productId,
           rating: newReview.rating,
           comment: newReview.comment,
-        },
-        {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
-      );
-
-      console.log("Review response:", response.data);
-
-      if (response.data.success) {
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
         showSuccess("Ulasan berhasil ditambahkan");
         handleCloseReviewDialog();
-        fetchOrders(); // Refresh orders to update review status
+        fetchOrders();
       } else {
         showError("Gagal menambahkan ulasan");
       }
     } catch (error) {
       console.error("Review submission error:", error);
-      const errorMessage =
-        error.response?.data?.error ||
-        error.message ||
-        "Gagal menambahkan ulasan";
-      showError(errorMessage);
+      showError(error.message || "Gagal menambahkan ulasan");
     } finally {
       setReviewLoading(false);
     }
@@ -197,10 +180,10 @@ export default function OrdersPage() {
 
   const checkIfCanReview = async (productId) => {
     try {
-      const response = await axios.get(
-        `/api/reviews?productId=${productId}&userId=${user.id}`
-      );
-      return response.data.canReview;
+      const res = await fetch(`/api/reviews?productId=${productId}`);
+      if (!res.ok) throw new Error("Gagal cek review");
+      const data = await res.json();
+      return data.canReview;
     } catch (error) {
       return false;
     }

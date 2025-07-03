@@ -30,10 +30,21 @@ export async function GET(request) {
     const featured = searchParams.get("featured") === "true";
     const minPrice = searchParams.get("minPrice");
     const maxPrice = searchParams.get("maxPrice");
+    const status = searchParams.get("status");
 
     const skip = (page - 1) * limit;
 
-    let where = { isActive: true };
+    let where = {};
+    if (status === "active") {
+      where.isActive = true;
+    } else if (status === "inactive") {
+      where.isActive = false;
+    } else if (!status) {
+      // tidak set isActive di where
+    } else {
+      // default: tetap hanya produk aktif
+      where.isActive = true;
+    }
 
     if (category) {
       where.category = { slug: category };
@@ -174,7 +185,25 @@ export async function POST(request) {
 
     // Buat produk dalam transaction
     const result = await prisma.$transaction(async (tx) => {
-      // Buat produk
+      // Pastikan images array string
+      let imagesArr = [];
+      if (Array.isArray(data.images)) {
+        imagesArr = data.images.filter(
+          (img) => typeof img === "string" && img.trim() !== ""
+        );
+      } else if (typeof data.images === "string" && data.images.trim() !== "") {
+        try {
+          const parsed = JSON.parse(data.images);
+          imagesArr = Array.isArray(parsed)
+            ? parsed.filter(
+                (img) => typeof img === "string" && img.trim() !== ""
+              )
+            : [];
+        } catch {
+          imagesArr = [];
+        }
+      }
+      // Simpan images sebagai string
       const product = await tx.product.create({
         data: {
           name: data.name,
@@ -186,7 +215,7 @@ export async function POST(request) {
           stock: parseInt(data.stock) || 0,
           weight: data.weight ? parseInt(data.weight) : null,
           dimensions: data.dimensions || null,
-          images: data.images ? JSON.stringify(data.images) : null,
+          images: JSON.stringify(imagesArr),
           isActive: data.isActive !== undefined ? data.isActive : true,
           isFeatured: data.isFeatured || false,
           categoryId: data.categoryId,
