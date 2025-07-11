@@ -30,7 +30,7 @@ export async function PUT(request, { params }) {
       );
     }
 
-    const { id } = params;
+    const { id } = await params;
     const data = await request.json();
 
     const category = await prisma.category.update({
@@ -64,25 +64,17 @@ export async function DELETE(request, { params }) {
       );
     }
 
-    const { id } = params;
+    const { id } = await params;
 
-    // Cek apakah kategori memiliki produk
-    const productCount = await prisma.product.count({
-      where: { categoryId: id },
-    });
-
-    if (productCount > 0) {
-      return NextResponse.json(
-        { error: "Tidak dapat menghapus kategori yang memiliki produk" },
-        { status: 400 }
-      );
-    }
-
-    await prisma.category.delete({
+    // Soft delete: update deletedAt
+    await prisma.category.update({
       where: { id },
+      data: { deletedAt: new Date() },
     });
 
-    return NextResponse.json({ message: "Kategori berhasil dihapus" });
+    return NextResponse.json({
+      message: "Kategori berhasil dihapus (soft delete)",
+    });
   } catch (error) {
     console.error("Error deleting category:", error);
     return NextResponse.json(

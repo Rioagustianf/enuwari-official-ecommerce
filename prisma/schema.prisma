@@ -34,6 +34,7 @@ model Category {
   isActive    Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
 
   products Product[]
 
@@ -57,6 +58,7 @@ model Product {
   categoryId  String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
 
   category     Category     @relation(fields: [categoryId], references: [id])
   orderItems   OrderItem[]

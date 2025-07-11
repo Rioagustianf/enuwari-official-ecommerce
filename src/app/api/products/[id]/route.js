@@ -5,10 +5,10 @@ const prisma = new PrismaClient();
 
 export async function GET(request, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
-    const product = await prisma.product.findUnique({
-      where: { id },
+    const product = await prisma.product.findFirst({
+      where: { id, deletedAt: null },
       include: {
         category: true,
         productSizes: true,
@@ -37,11 +37,16 @@ export async function GET(request, { params }) {
           product.reviews.length
         : 0;
 
-    return NextResponse.json({
+    // Konversi Decimal ke Number untuk harga
+    const productWithConvertedPrices = {
       ...product,
+      price: Number(product.price),
+      salePrice: product.salePrice ? Number(product.salePrice) : null,
       averageRating,
       reviewCount: product.reviews.length,
-    });
+    };
+
+    return NextResponse.json(productWithConvertedPrices);
   } catch (error) {
     console.error("Error fetching product:", error);
     return NextResponse.json(
@@ -53,15 +58,43 @@ export async function GET(request, { params }) {
 
 export async function PUT(request, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const data = await request.json();
+
+    // Validasi harga
+    const price = data.price ? parseFloat(data.price) : null;
+    const salePrice = data.salePrice ? parseFloat(data.salePrice) : null;
+
+    if (price !== null) {
+      if (isNaN(price) || price <= 0) {
+        return NextResponse.json(
+          { error: "Harga harus berupa angka positif" },
+          { status: 400 }
+        );
+      }
+    }
+
+    if (salePrice !== null) {
+      if (isNaN(salePrice) || salePrice < 0) {
+        return NextResponse.json(
+          { error: "Harga diskon harus berupa angka positif" },
+          { status: 400 }
+        );
+      }
+      if (price !== null && salePrice >= price) {
+        return NextResponse.json(
+          { error: "Harga diskon harus lebih kecil dari harga asli" },
+          { status: 400 }
+        );
+      }
+    }
 
     // Mapping data update
     const updateData = {
       name: data.name,
       description: data.description || null,
-      price: data.price ? parseFloat(data.price) : null,
-      salePrice: data.salePrice ? parseFloat(data.salePrice) : null,
+      price: price,
+      salePrice: salePrice,
       sku: data.sku,
       stock: data.stock ? parseInt(data.stock) : 0,
       weight: data.weight ? parseInt(data.weight) : null,
@@ -118,13 +151,17 @@ export async function PUT(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
 
-    await prisma.product.delete({
+    // Soft delete: update deletedAt
+    await prisma.product.update({
       where: { id },
+      data: { deletedAt: new Date() },
     });
 
-    return NextResponse.json({ message: "Produk berhasil dihapus" });
+    return NextResponse.json({
+      message: "Produk berhasil dihapus (soft delete)",
+    });
   } catch (error) {
     console.error("Error deleting product:", error);
     return NextResponse.json(

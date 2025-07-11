@@ -22,9 +22,7 @@ async function getUserFromToken(request) {
 export async function GET(request, { params }) {
   try {
     const user = await getUserFromToken(request);
-    // Await params before accessing properties
-    const resolvedParams = await params;
-    const { id } = resolvedParams;
+    const { id } = await params;
 
     let where = { id };
 
@@ -71,9 +69,7 @@ export async function GET(request, { params }) {
 export async function PUT(request, { params }) {
   try {
     const user = await getUserFromToken(request);
-    // Await params before accessing properties
-    const resolvedParams = await params;
-    const { id } = resolvedParams;
+    const { id } = await params;
     const { status, paymentStatus, trackingNumber } = await request.json();
 
     // Hanya admin yang bisa update order

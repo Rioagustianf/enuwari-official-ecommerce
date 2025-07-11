@@ -69,14 +69,19 @@ export default function ProductForm({ product = null, isEdit = false }) {
           imagesArr = [];
         }
       }
+
+      // Konversi harga dari Number ke string untuk form input
+      const price = product.price ? product.price.toString() : "";
+      const salePrice = product.salePrice ? product.salePrice.toString() : "";
+
       setFormData({
         name: product.name || "",
         description: product.description || "",
-        price: product.price || "",
-        salePrice: product.salePrice || "",
+        price: price,
+        salePrice: salePrice,
         sku: product.sku || "",
-        stock: product.stock || "",
-        weight: product.weight || "",
+        stock: product.stock ? product.stock.toString() : "",
+        weight: product.weight ? product.weight.toString() : "",
         dimensions: product.dimensions || "",
         categoryId: product.categoryId || "",
         isActive: product.isActive !== undefined ? product.isActive : true,
@@ -169,11 +174,30 @@ export default function ProductForm({ product = null, isEdit = false }) {
     setError(null);
 
     try {
+      // Validasi harga
+      const price = parseFloat(formData.price);
+      const salePrice = formData.salePrice
+        ? parseFloat(formData.salePrice)
+        : null;
+
+      if (isNaN(price) || price <= 0) {
+        throw new Error("Harga harus berupa angka positif");
+      }
+
+      if (salePrice !== null) {
+        if (isNaN(salePrice) || salePrice < 0) {
+          throw new Error("Harga diskon harus berupa angka positif");
+        }
+        if (salePrice >= price) {
+          throw new Error("Harga diskon harus lebih kecil dari harga asli");
+        }
+      }
+
       const submitData = {
         ...formData,
-        price: parseFloat(formData.price),
-        salePrice: formData.salePrice ? parseFloat(formData.salePrice) : null,
-        stock: parseInt(formData.stock),
+        price: price,
+        salePrice: salePrice,
+        stock: parseInt(formData.stock) || 0,
         weight: formData.weight ? parseInt(formData.weight) : null,
         images: JSON.stringify(formData.images),
         isActive: Boolean(formData.isActive),
@@ -268,6 +292,8 @@ export default function ProductForm({ product = null, isEdit = false }) {
                 label="SKU"
                 value={formData.sku}
                 onChange={(e) => handleInputChange("sku", e.target.value)}
+                placeholder="PROD-001"
+                helperText="Kode unik produk (contoh: PROD-001)"
                 required
               />
             </Grid>
@@ -279,6 +305,9 @@ export default function ProductForm({ product = null, isEdit = false }) {
                 type="number"
                 value={formData.price}
                 onChange={(e) => handleInputChange("price", e.target.value)}
+                placeholder="0"
+                inputProps={{ min: 0, step: 1000 }}
+                helperText="Harga dalam Rupiah (tanpa titik/koma)"
                 required
               />
             </Grid>
@@ -290,6 +319,26 @@ export default function ProductForm({ product = null, isEdit = false }) {
                 type="number"
                 value={formData.salePrice}
                 onChange={(e) => handleInputChange("salePrice", e.target.value)}
+                placeholder="0"
+                inputProps={{
+                  min: 0,
+                  step: 1000,
+                  max: formData.price
+                    ? parseFloat(formData.price) - 1
+                    : undefined,
+                }}
+                helperText={
+                  formData.price &&
+                  formData.salePrice &&
+                  parseFloat(formData.salePrice) >= parseFloat(formData.price)
+                    ? "Harga diskon harus lebih kecil dari harga asli"
+                    : "Harga diskon dalam Rupiah (opsional)"
+                }
+                error={
+                  formData.price &&
+                  formData.salePrice &&
+                  parseFloat(formData.salePrice) >= parseFloat(formData.price)
+                }
               />
             </Grid>
 

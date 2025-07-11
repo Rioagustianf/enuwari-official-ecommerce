@@ -87,7 +87,10 @@ export async function GET(request) {
 
     const [products, total] = await Promise.all([
       prisma.product.findMany({
-        where,
+        where: {
+          ...where,
+          deletedAt: null,
+        },
         include: {
           category: true,
           productSizes: true,
@@ -102,7 +105,7 @@ export async function GET(request) {
         skip,
         take: limit,
       }),
-      prisma.product.count({ where }),
+      prisma.product.count({ where: { ...where, deletedAt: null } }),
     ]);
 
     const productsWithRating = products.map((product) => ({
@@ -153,6 +156,32 @@ export async function POST(request) {
         { error: "Data produk tidak lengkap" },
         { status: 400 }
       );
+    }
+
+    // Validasi harga
+    const price = parseFloat(data.price);
+    const salePrice = data.salePrice ? parseFloat(data.salePrice) : null;
+
+    if (isNaN(price) || price <= 0) {
+      return NextResponse.json(
+        { error: "Harga harus berupa angka positif" },
+        { status: 400 }
+      );
+    }
+
+    if (salePrice !== null) {
+      if (isNaN(salePrice) || salePrice < 0) {
+        return NextResponse.json(
+          { error: "Harga diskon harus berupa angka positif" },
+          { status: 400 }
+        );
+      }
+      if (salePrice >= price) {
+        return NextResponse.json(
+          { error: "Harga diskon harus lebih kecil dari harga asli" },
+          { status: 400 }
+        );
+      }
     }
 
     // Cek apakah SKU sudah ada
@@ -209,8 +238,8 @@ export async function POST(request) {
           name: data.name,
           slug: finalSlug,
           description: data.description || null,
-          price: parseFloat(data.price),
-          salePrice: data.salePrice ? parseFloat(data.salePrice) : null,
+          price: price,
+          salePrice: salePrice,
           sku: data.sku,
           stock: parseInt(data.stock) || 0,
           weight: data.weight ? parseInt(data.weight) : null,

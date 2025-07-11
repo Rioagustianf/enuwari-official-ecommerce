@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 export async function PUT(request, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     const { title, subtitle, image, link, order, isActive } =
       await request.json();
     if (!title || !image) {
@@ -27,7 +27,7 @@ export async function PUT(request, { params }) {
 
 export async function DELETE(request, { params }) {
   try {
-    const { id } = params;
+    const { id } = await params;
     await prisma.banner.delete({ where: { id } });
     return NextResponse.json({ message: "Banner berhasil dihapus" });
   } catch (error) {

@@ -9,11 +9,11 @@ export async function GET(request) {
     const includeProducts = searchParams.get("includeProducts") === "true";
 
     const categories = await prisma.category.findMany({
-      where: { isActive: true },
+      where: { isActive: true, deletedAt: null },
       include: includeProducts
         ? {
             products: {
-              where: { isActive: true },
+              where: { isActive: true, deletedAt: null },
               take: 5,
             },
           }
