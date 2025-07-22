@@ -168,6 +168,12 @@ export default function ProductForm({ product = null, isEdit = false }) {
     }));
   };
 
+  const cleanNumber = (value) => {
+    if (typeof value !== "string") return value;
+    // Hanya ambil digit dan titik/koma
+    return value.replace(/[^\d.,]/g, "").replace(/,/g, ".");
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -175,9 +181,9 @@ export default function ProductForm({ product = null, isEdit = false }) {
 
     try {
       // Validasi harga
-      const price = parseFloat(formData.price);
+      const price = parseFloat(cleanNumber(formData.price));
       const salePrice = formData.salePrice
-        ? parseFloat(formData.salePrice)
+        ? parseFloat(cleanNumber(formData.salePrice))
         : null;
 
       if (isNaN(price) || price <= 0) {

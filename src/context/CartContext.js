@@ -119,7 +119,6 @@ export function CartProvider({ children }) {
       stock: product.stock,
     };
     dispatch({ type: "ADD_TO_CART", payload: cartItem });
-    toast.success("Produk ditambahkan ke keranjang");
     if (user) {
       await fetch("/api/cart", {
         method: "POST",

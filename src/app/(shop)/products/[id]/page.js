@@ -111,18 +111,20 @@ export default function ProductDetailPage({ params }) {
     }
   };
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
+    if (!user) {
+      router.push("/login");
+      return;
+    }
     if (product.productSizes.length > 0 && !selectedSize) {
       showError("Pilih ukuran terlebih dahulu");
       return;
     }
-
     if (quantity > product.stock) {
       showError("Jumlah melebihi stok yang tersedia");
       return;
     }
-
-    addToCart(product, quantity, selectedSize);
+    await addToCart(product, quantity, selectedSize);
     showSuccess("Produk berhasil ditambahkan ke keranjang");
   };
 

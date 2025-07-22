@@ -33,14 +33,27 @@ export default function ProductCard({ product }) {
   const { showSuccess, showError } = useContext(NotificationContext);
   const [imageLoading, setImageLoading] = useState(true);
   const [isHovered, setIsHovered] = useState(false);
+  const [selectedSize, setSelectedSize] = useState("");
 
-  const handleAddToCart = (e) => {
+  const handleAddToCart = async (e) => {
     e.stopPropagation();
+    if (!user) {
+      router.push("/login");
+      return;
+    }
     if (product.stock === 0) {
       showError("Produk sedang habis stok");
       return;
     }
-    addToCart(product, 1);
+    if (
+      Array.isArray(product.productSizes) &&
+      product.productSizes.length > 0 &&
+      !selectedSize
+    ) {
+      showError("Pilih ukuran terlebih dahulu");
+      return;
+    }
+    await addToCart(product, 1, selectedSize || null);
     showSuccess("Produk ditambahkan ke keranjang");
   };
 
@@ -83,12 +96,14 @@ export default function ProductCard({ product }) {
         },
         position: "relative",
       }}
-      onClick={handleViewProduct}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Image Container */}
-      <Box sx={{ position: "relative", overflow: "hidden", height: 240 }}>
+      <Box
+        sx={{ position: "relative", overflow: "hidden", height: 240 }}
+        onClick={handleViewProduct}
+      >
         <CardMedia
           component="img"
           height="100%"
@@ -102,7 +117,6 @@ export default function ProductCard({ product }) {
             width: "100%",
           }}
         />
-
         {/* Overlay Actions */}
         <Fade in={isHovered}>
           <Box
@@ -131,13 +145,16 @@ export default function ProductCard({ product }) {
                 textTransform: "none",
                 fontWeight: 600,
               }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleViewProduct();
+              }}
             >
               Lihat Detail
             </Button>
           </Box>
         </Fade>
-
-        {/* Badges */}
+        {/* Badges, Wishlist Button, dst tetap di sini */}
         <Box
           sx={{
             position: "absolute",
@@ -230,7 +247,12 @@ export default function ProductCard({ product }) {
           variant="caption"
           color="primary.main"
           fontWeight="600"
-          sx={{ textTransform: "uppercase", letterSpacing: 0.5 }}
+          sx={{
+            textTransform: "uppercase",
+            letterSpacing: 0.5,
+            cursor: "pointer",
+          }}
+          onClick={handleViewProduct}
         >
           {product.category.name}
         </Typography>
@@ -249,7 +271,9 @@ export default function ProductCard({ product }) {
             WebkitBoxOrient: "vertical",
             minHeight: "2.6em",
             fontSize: "0.95rem",
+            cursor: "pointer",
           }}
+          onClick={handleViewProduct}
         >
           {product.name}
         </Typography>
@@ -263,7 +287,13 @@ export default function ProductCard({ product }) {
                   key={idx}
                   label={size.size}
                   size="small"
-                  variant="outlined"
+                  variant={selectedSize === size.size ? "filled" : "outlined"}
+                  color={selectedSize === size.size ? "primary" : "default"}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedSize(size.size);
+                  }}
+                  sx={{ cursor: "pointer" }}
                 />
               ))}
             </Box>

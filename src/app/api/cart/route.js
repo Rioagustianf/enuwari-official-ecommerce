@@ -210,12 +210,17 @@ export async function DELETE(request) {
 
     if (cartItemId) {
       // Hapus item tertentu
-      await prisma.cartItem.delete({
-        where: {
-          id: cartItemId,
-          userId: user.userId,
-        },
-      });
+      try {
+        await prisma.cartItem.delete({
+          where: {
+            id: cartItemId,
+            userId: user.userId,
+          },
+        });
+      } catch (err) {
+        // Jika error P2025 (record not found), anggap sukses (idempotent)
+        if (err.code !== "P2025") throw err;
+      }
     } else {
       // Hapus semua item di cart
       await prisma.cartItem.deleteMany({
