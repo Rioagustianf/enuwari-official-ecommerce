@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import axios from "axios";
 
-const RAJAONGKIR_BASE_URL = "https://api.rajaongkir.com/starter";
+// Ganti base URL ke sandbox untuk development gratis
+const RAJAONGKIR_BASE_URL = "https://rajaongkir.komerce.id/api/v1";
 
 export async function POST(request) {
   try {
@@ -15,7 +16,6 @@ export async function POST(request) {
       );
     }
 
-    // Validasi API key
     if (!process.env.RAJAONGKIR_API_KEY) {
       return NextResponse.json(
         { error: "RajaOngkir API key tidak ditemukan" },
@@ -23,63 +23,41 @@ export async function POST(request) {
       );
     }
 
-    console.log("RajaOngkir request:", {
-      origin,
-      destination,
-      weight,
-      courier,
-    });
+    // Komerce API V2: gunakan /calculate/district/domestic-cost
+    const params = new URLSearchParams();
+    params.append("origin", origin.toString());
+    params.append("destination", destination.toString());
+    params.append("weight", weight.toString());
+    params.append("courier", courier);
+    params.append("price", "lowest");
 
     const response = await axios.post(
-      `${RAJAONGKIR_BASE_URL}/cost`,
-      {
-        origin: origin.toString(),
-        destination: destination.toString(),
-        weight: parseInt(weight),
-        courier: courier,
-      },
+      `${RAJAONGKIR_BASE_URL}/calculate/district/domestic-cost`,
+      params,
       {
         headers: {
           key: process.env.RAJAONGKIR_API_KEY,
-          "content-type": "application/x-www-form-urlencoded",
+          "Content-Type": "application/x-www-form-urlencoded",
         },
         timeout: 10000,
       }
     );
 
-    console.log("RajaOngkir response:", response.data);
-
-    if (response.data.rajaongkir.status.code === 200) {
-      return NextResponse.json(response.data);
-    } else {
-      return NextResponse.json(
-        { error: response.data.rajaongkir.status.description },
-        { status: 400 }
-      );
-    }
+    return NextResponse.json(response.data);
   } catch (error) {
-    console.error("RajaOngkir error:", error.response?.data || error.message);
-
-    if (error.response?.status === 400) {
-      return NextResponse.json(
-        { error: "API key tidak valid atau parameter salah" },
-        { status: 400 }
-      );
-    }
-
-    return NextResponse.json(
-      { error: "Gagal mengambil data ongkir" },
-      { status: 500 }
-    );
+    const komerceError = error.response?.data || error.message;
+    console.error("RajaOngkir error:", komerceError);
+    return NextResponse.json({ error: komerceError }, { status: 500 });
   }
 }
 
-// API untuk mendapatkan daftar provinsi
+// API untuk mendapatkan daftar provinsi/kota
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const type = searchParams.get("type");
-    const provinceId = searchParams.get("province");
+    // Komerce API pakai province_id
+    const provinceId = searchParams.get("province_id");
 
     if (!process.env.RAJAONGKIR_API_KEY) {
       return NextResponse.json(
@@ -88,28 +66,35 @@ export async function GET(request) {
       );
     }
 
-    let url = `${RAJAONGKIR_BASE_URL}/province`;
-
-    if (type === "city" && provinceId) {
-      url = `${RAJAONGKIR_BASE_URL}/city?province=${provinceId}`;
+    let url = "";
+    if (type === "province") {
+      url = `${RAJAONGKIR_BASE_URL}/destination/province`;
+    } else if (type === "city" && provinceId) {
+      url = `${RAJAONGKIR_BASE_URL}/destination/city/${provinceId}`;
+    } else {
+      return NextResponse.json(
+        { error: "Parameter tidak valid" },
+        { status: 400 }
+      );
     }
 
-    const response = await axios.get(url, {
-      headers: {
-        key: process.env.RAJAONGKIR_API_KEY,
-      },
-      timeout: 10000,
-    });
-
-    return NextResponse.json(response.data);
+    try {
+      const response = await axios.get(url, {
+        headers: {
+          key: process.env.RAJAONGKIR_API_KEY,
+        },
+        timeout: 10000,
+      });
+      return NextResponse.json(response.data);
+    } catch (error) {
+      const komerceError = error.response?.data || error.message;
+      console.error("RajaOngkir GET error:", komerceError);
+      return NextResponse.json({ error: komerceError }, { status: 500 });
+    }
   } catch (error) {
-    console.error(
-      "RajaOngkir GET error:",
-      error.response?.data || error.message
-    );
-    return NextResponse.json(
-      { error: "Gagal mengambil data wilayah" },
-      { status: 500 }
-    );
+    // Kirim error detail dari Komerce ke frontend
+    const komerceError = error.response?.data || error.message;
+    console.error("RajaOngkir GET error:", komerceError);
+    return NextResponse.json({ error: komerceError }, { status: 500 });
   }
 }

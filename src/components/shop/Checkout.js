@@ -25,6 +25,7 @@ import {
   Radio,
   RadioGroup,
   FormControlLabel,
+  Autocomplete,
 } from "@mui/material";
 import { CartContext } from "@/context/CartContext";
 import { AuthContext } from "@/context/AuthContext";
@@ -104,8 +105,10 @@ export default function Checkout() {
       const response = await axios.get(
         "/api/shipping/rajaongkir?type=province"
       );
-      if (response.data.rajaongkir?.results) {
-        setProvinces(response.data.rajaongkir.results);
+      if (Array.isArray(response.data.data)) {
+        setProvinces(response.data.data);
+      } else {
+        setProvinces([]);
       }
     } catch (error) {
       console.error("Error fetching provinces:", error);
@@ -115,10 +118,12 @@ export default function Checkout() {
   const fetchCities = async (provinceId) => {
     try {
       const response = await axios.get(
-        `/api/shipping/rajaongkir?type=city&province=${provinceId}`
+        `/api/shipping/rajaongkir?type=city&province_id=${provinceId}`
       );
-      if (response.data.rajaongkir?.results) {
-        setCities(response.data.rajaongkir.results);
+      if (Array.isArray(response.data.data)) {
+        setCities(response.data.data);
+      } else {
+        setCities([]);
       }
     } catch (error) {
       console.error("Error fetching cities:", error);
@@ -154,20 +159,15 @@ export default function Checkout() {
 
       console.log("Shipping response:", response.data);
 
-      if (response.data.rajaongkir?.results) {
-        const options = [];
-        response.data.rajaongkir.results.forEach((courier) => {
-          courier.costs.forEach((cost) => {
-            options.push({
-              courier: courier.code,
-              courierName: courier.name,
-              service: cost.service,
-              description: cost.description,
-              cost: cost.cost[0].value,
-              etd: cost.cost[0].etd,
-            });
-          });
-        });
+      if (Array.isArray(response.data.data)) {
+        const options = response.data.data.map((item) => ({
+          courier: item.code,
+          courierName: item.name,
+          service: item.service,
+          description: item.description,
+          cost: item.cost,
+          etd: item.etd,
+        }));
         setShippingOptions(options);
       } else {
         throw new Error("Format response tidak valid");
@@ -405,36 +405,42 @@ export default function Checkout() {
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth>
-                <InputLabel>Provinsi</InputLabel>
-                <Select
-                  value={shippingData.province}
-                  onChange={(e) => handleProvinceChange(e.target.value)}
-                >
-                  {provinces.map((province) => (
-                    <MenuItem
-                      key={province.province_id}
-                      value={province.province_id}
-                    >
-                      {province.province}
-                    </MenuItem>
-                  ))}
-                </Select>
+                <Autocomplete
+                  options={provinces}
+                  getOptionLabel={(option) => option.name || ""}
+                  value={
+                    provinces.find((p) => p.id === shippingData.province) ||
+                    null
+                  }
+                  onChange={(_, newValue) => {
+                    handleProvinceChange(newValue ? newValue.id : "");
+                  }}
+                  isOptionEqualToValue={(option, value) =>
+                    option.id === value.id
+                  }
+                  renderInput={(params) => (
+                    <TextField {...params} label="Provinsi" required />
+                  )}
+                />
               </FormControl>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth>
-                <InputLabel>Kota/Kabupaten</InputLabel>
-                <Select
-                  value={shippingData.city}
-                  onChange={(e) => handleCityChange(e.target.value)}
+                <Autocomplete
+                  options={cities}
+                  getOptionLabel={(option) => option.name || ""}
+                  value={cities.find((c) => c.id === shippingData.city) || null}
+                  onChange={(_, newValue) => {
+                    handleCityChange(newValue ? newValue.id : "");
+                  }}
+                  isOptionEqualToValue={(option, value) =>
+                    option.id === value.id
+                  }
+                  renderInput={(params) => (
+                    <TextField {...params} label="Kota/Kabupaten" required />
+                  )}
                   disabled={!cities.length}
-                >
-                  {cities.map((city) => (
-                    <MenuItem key={city.city_id} value={city.city_id}>
-                      {city.city_name}
-                    </MenuItem>
-                  ))}
-                </Select>
+                />
               </FormControl>
             </Grid>
             <Grid size={{ xs: 12, sm: 6 }}>
